@@ -1,0 +1,4 @@
+./utilities/ovs-ofctl add-flow br1 in_port=3,actions=output:1
+./utilities/ovs-ofctl add-flow br1 in_port=1,actions=output:3
+./utilities/ovs-ofctl add-flow br1 in_port=4,actions=output:2
+./utilities/ovs-ofctl add-flow br1 in_port=2,actions=output:4

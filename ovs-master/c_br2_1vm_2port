@@ -1,0 +1,17 @@
+./utilities/ovs-vsctl del-br br1
+./utilities/ovs-vsctl add-br br1 -- set bridge br1 datapath_type=netdev
+./utilities/ovs-vsctl add-port br1 dpdkvhost2 -- set Interface dpdkvhost2 type=dpdkvhostcuse
+./utilities/ovs-vsctl add-port br1 dpdkvhost3 -- set Interface dpdkvhost3 type=dpdkvhostcuse
+./utilities/ovs-vsctl add-port br1 dpdk2 -- set Interface dpdk2 type=dpdk
+./utilities/ovs-vsctl add-port br1 dpdk3 -- set Interface dpdk3 type=dpdk
+
+#./utilities/ovs-vsctl add-port br0 dpdk0:patch -- set Interface dpdk0:patch type=dpdkpatch options:peer=dpdkvhost0
+#./utilities/ovs-vsctl add-port br0 dpdk1:patch -- set Interface dpdk1:patch type=dpdkpatch options:peer=dpdkvhost1
+
+#./utilities/ovs-vsctl add-port br0 dpdkvhost0:patch -- set Interface dpdkvhost0:patch type=dpdkpatch options:peer=dpdkvhost1
+#./utilities/ovs-vsctl add-port br0 dpdkvhost1:patch -- set Interface dpdkvhost1:patch type=dpdkpatch options:peer=dpdkvhost0
+
+./utilities/ovs-vsctl show
+
+./utilities/ovs-ofctl show br0
+

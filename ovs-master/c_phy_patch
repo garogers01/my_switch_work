@@ -1,0 +1,5 @@
+
+./utilities/ovs-vsctl add-port br0 dpdk0:patch -- set Interface dpdk0:patch type=dpdkpatch options:peer=dpdk1
+./utilities/ovs-vsctl add-port br0 dpdk1:patch -- set Interface dpdk1:patch type=dpdkpatch options:peer=dpdk0
+./utilities/ovs-vsctl add-port br0 dpdk2:patch -- set Interface dpdk2:patch type=dpdkpatch options:peer=dpdk3
+./utilities/ovs-vsctl add-port br0 dpdk3:patch -- set Interface dpdk3:patch type=dpdkpatch options:peer=dpdk2

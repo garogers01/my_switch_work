@@ -1,0 +1,38 @@
+./utilities/ovs-ofctl add-flow br0 in_port=3,actions=output:1
+./utilities/ovs-ofctl add-flow br0 in_port=1,actions=output:3
+./utilities/ovs-ofctl add-flow br0 in_port=4,actions=output:2
+./utilities/ovs-ofctl add-flow br0 in_port=2,actions=output:4
+
+ 1(dpdkvhost3): addr:00:00:00:00:00:00
+ 2(dpdk1): addr:90:e2:ba:0e:4e:19
+ 3(dpdk2): addr:00:1b:21:b9:9f:c0
+ 4(dpdkvhost0): addr:00:00:00:00:00:00
+     config:     PORT_DOWN
+     state:      LINK_DOWN
+     speed: 0 Mbps now, 0 Mbps max
+ 5(dpdk3): addr:00:1b:21:b9:9f:c1
+     config:     0
+     state:      0
+     current:    10GB-FD
+     supported:  10MB-FD 100MB-HD 1GB-HD 1GB-FD FIBER
+     speed: 10000 Mbps now, 1000 Mbps max
+ 6(dpdkvhost2): addr:00:00:00:00:00:00
+     config:     PORT_DOWN
+     state:      LINK_DOWN
+     speed: 0 Mbps now, 0 Mbps max
+ 7(dpdkvhost1): addr:00:00:00:00:00:00
+     config:     PORT_DOWN
+     state:      LINK_DOWN
+     speed: 0 Mbps now, 0 Mbps max
+ 8(dpdk0): addr:90:e2:ba:0e:4e:18
+     config:     0
+     state:      0
+     current:    10GB-FD
+     supported:  10MB-FD 100MB-HD 1GB-HD 1GB-FD FIBER
+     speed: 10000 Mbps now, 1000 Mbps max
+ LOCAL(br0): addr:00:1b:21:b9:9f:c0
+     config:     PORT_DOWN
+     state:      LINK_DOWN
+     current:    10MB-FD COPPER
+     speed: 10 Mbps now, 0 Mbps max
+OFPT_GET_CONFIG_REPLY (xid=0x4): frags=normal miss_send_len=0

@@ -1,0 +1,8 @@
+./utilities/ovs-vsctl del-br br0
+./utilities/ovs-vsctl add-br br0 -- set bridge br0 datapath_type=netdev
+./utilities/ovs-vsctl add-port br0 dpdkvhost0 -- set Interface dpdkvhost0 type=dpdkvhost
+./utilities/ovs-vsctl add-port br0 dpdkvhost1 -- set Interface dpdkvhost1 type=dpdkvhost
+./utilities/ovs-vsctl add-port br0 dpdkvhost2 -- set Interface dpdkvhost2 type=dpdkvhost
+./utilities/ovs-vsctl add-port br0 dpdkvhost3 -- set Interface dpdkvhost3 type=dpdkvhost
+./utilities/ovs-vsctl show
+

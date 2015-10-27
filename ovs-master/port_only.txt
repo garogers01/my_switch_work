@@ -1,0 +1,57 @@
+diff --git a/lib/dpif-netdev.c b/lib/dpif-netdev.c
+index e6ba33f..6b89709 100644
+--- a/lib/dpif-netdev.c
++++ b/lib/dpif-netdev.c
+@@ -2513,7 +2513,9 @@ dp_netdev_process_rxq_port(struct dp_netdev_pmd_thread *pmd,
+ 
+         /* XXX: initialize md in netdev implementation. */
+         for (i = 0; i < cnt; i++) {
+-            pkt_metadata_init(&packets[i]->md, port->port_no);
++            //pkt_metadata_init(&packets[i]->md, port->port_no);
++            packets[i]->md.in_port.odp_port = port->port_no;
++            packets[i]->md.port_only = 1;
+         }
+         cycles_count_start(pmd);
+         dp_netdev_input(pmd, packets, cnt);
+diff --git a/lib/flow.c b/lib/flow.c
+index 84048e8..0815097 100644
+--- a/lib/flow.c
++++ b/lib/flow.c
+@@ -448,6 +448,7 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
+     ovs_be16 dl_type;
+     uint8_t nw_frag, nw_tos, nw_ttl, nw_proto;
+ 
++    if (md->port_only == 0) {
+     /* Metadata. */
+     if (md->tunnel.ip_dst) {
+         miniflow_push_words(mf, tunnel, &md->tunnel,
+@@ -475,12 +476,15 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
+         miniflow_push_uint32(mf, skb_priority, md->skb_priority);
+         miniflow_push_uint32(mf, pkt_mark, md->pkt_mark);
+     }
+-    miniflow_push_uint32(mf, dp_hash, md->dp_hash);
+-    miniflow_push_uint32(mf, in_port, odp_to_u32(md->in_port.odp_port));
++    //miniflow_push_uint32(mf, dp_hash, md->dp_hash);
++    //miniflow_push_uint32(mf, in_port, odp_to_u32(md->in_port.odp_port));
+     if (md->recirc_id) {
+         miniflow_push_uint32(mf, recirc_id, md->recirc_id);
+         miniflow_pad_to_64(mf, conj_id);
+     }
++    }
++    miniflow_push_uint32(mf, dp_hash, md->dp_hash);
++    miniflow_push_uint32(mf, in_port, odp_to_u32(md->in_port.odp_port));
+ 
+     /* Initialize packet's layer pointer and offsets. */
+     l2 = data;
+diff --git a/lib/packets.h b/lib/packets.h
+index 4fb1427..5738030 100644
+--- a/lib/packets.h
++++ b/lib/packets.h
+@@ -118,6 +118,7 @@ union flow_in_port {
+ 
+ /* Datapath packet metadata */
+ struct pkt_metadata {
++    uint8_t port_only;          /* Indicates that only port in metadata is valid*/
+     uint32_t recirc_id;         /* Recirculation id carried with the
+                                    recirculating packets. 0 for packets
+                                    received from the wire. */
