@@ -175,12 +175,26 @@ struct rte_mempool_objtlr {
 #endif
 };
 
+/* Pointer to a data structure for the underlying common pool */
+typedef void *rte_mempool_rt_pool;
+
+int
+rte_mempool_ext_get_bulk(struct rte_mempool *mp, void **obj_table,
+		unsigned n);
+
+int
+rte_mempool_ext_put_bulk(struct rte_mempool *mp, void * const *obj_table,
+		unsigned n);
+
+int
+rte_mempool_ext_get_count(const struct rte_mempool *mp);
+
 /**
  * The RTE mempool structure.
  */
 struct rte_mempool {
 	char name[RTE_MEMPOOL_NAMESIZE]; /**< Name of mempool. */
-	struct rte_ring *ring;           /**< Ring to store objects. */
+// struct rte_ring *ring;           /**< Ring to store objects. */
 	phys_addr_t phys_addr;           /**< Phys. addr. of mempool struct. */
 	int flags;                       /**< Flags of the mempool. */
 	uint32_t size;                   /**< Size of the mempool. */
@@ -193,6 +207,13 @@ struct rte_mempool {
 	uint32_t trailer_size;           /**< Size of trailer (after elt). */
 
 	unsigned private_data_size;      /**< Size of private data. */
+
+	/* Common pool data structure pointer */
+	rte_mempool_rt_pool rt_pool __rte_cache_aligned;
+
+	uint16_t put_idx;
+	uint16_t get_idx;
+	uint16_t get_count_idx;
 
 #if RTE_MEMPOOL_CACHE_MAX_SIZE > 0
 	/** Per-lcore local cache. */
@@ -223,6 +244,10 @@ struct rte_mempool {
 #define MEMPOOL_F_NO_CACHE_ALIGN 0x0002 /**< Do not align objs on cache lines.*/
 #define MEMPOOL_F_SP_PUT         0x0004 /**< Default put is "single-producer".*/
 #define MEMPOOL_F_SC_GET         0x0008 /**< Default get is "single-consumer".*/
+#define MEMPOOL_F_USE_STACK 	 0x0010 /**< Use a stack for the common pool. */
+#define MEMPOOL_F_USE_TM 		 0x0020
+#define MEMPOOL_F_NO_SECONDARY	 0x0040
+
 
 /**
  * @internal When debug is enabled, store some statistics.
@@ -754,7 +779,7 @@ void rte_mempool_dump(FILE *f, const struct rte_mempool *mp);
  */
 static inline void __attribute__((always_inline))
 __mempool_put_bulk(struct rte_mempool *mp, void * const *obj_table,
-		    unsigned n, int is_mp)
+		    unsigned n, __attribute__((unused)) int is_mp)
 {
 #if RTE_MEMPOOL_CACHE_MAX_SIZE > 0
 	struct rte_mempool_cache *cache;
@@ -770,8 +795,7 @@ __mempool_put_bulk(struct rte_mempool *mp, void * const *obj_table,
 
 #if RTE_MEMPOOL_CACHE_MAX_SIZE > 0
 	/* cache is not enabled or single producer or non-EAL thread */
-	if (unlikely(cache_size == 0 || is_mp == 0 ||
-		     lcore_id >= RTE_MAX_LCORE))
+	if (unlikely(cache_size == 0 || lcore_id >= RTE_MAX_LCORE))
 		goto ring_enqueue;
 
 	/* Go straight to ring if put would overflow mem allocated for cache */
@@ -794,9 +818,8 @@ __mempool_put_bulk(struct rte_mempool *mp, void * const *obj_table,
 
 	cache->len += n;
 
-	if (cache->len >= flushthresh) {
-		rte_ring_mp_enqueue_bulk(mp->ring, &cache->objs[cache_size],
-				cache->len - cache_size);
+	if(unlikely(cache->len >= flushthresh)) {
+		rte_mempool_ext_put_bulk(mp, &cache->objs[cache_size], cache->len - cache_size);
 		cache->len = cache_size;
 	}
 
@@ -805,22 +828,7 @@ __mempool_put_bulk(struct rte_mempool *mp, void * const *obj_table,
 ring_enqueue:
 #endif /* RTE_MEMPOOL_CACHE_MAX_SIZE > 0 */
 
-	/* push remaining objects in ring */
-#ifdef RTE_LIBRTE_MEMPOOL_DEBUG
-	if (is_mp) {
-		if (rte_ring_mp_enqueue_bulk(mp->ring, obj_table, n) < 0)
-			rte_panic("cannot put objects in mempool\n");
-	}
-	else {
-		if (rte_ring_sp_enqueue_bulk(mp->ring, obj_table, n) < 0)
-			rte_panic("cannot put objects in mempool\n");
-	}
-#else
-	if (is_mp)
-		rte_ring_mp_enqueue_bulk(mp->ring, obj_table, n);
-	else
-		rte_ring_sp_enqueue_bulk(mp->ring, obj_table, n);
-#endif
+	rte_mempool_ext_put_bulk(mp, obj_table, n);
 }
 
 
@@ -944,7 +952,7 @@ rte_mempool_put(struct rte_mempool *mp, void *obj)
  */
 static inline int __attribute__((always_inline))
 __mempool_get_bulk(struct rte_mempool *mp, void **obj_table,
-		   unsigned n, int is_mc)
+		   unsigned n, __attribute__((unused))int is_mc)
 {
 	int ret;
 #if RTE_MEMPOOL_CACHE_MAX_SIZE > 0
@@ -955,8 +963,7 @@ __mempool_get_bulk(struct rte_mempool *mp, void **obj_table,
 	uint32_t cache_size = mp->cache_size;
 
 	/* cache is not enabled or single consumer */
-	if (unlikely(cache_size == 0 || is_mc == 0 ||
-		     n >= cache_size || lcore_id >= RTE_MAX_LCORE))
+	if (unlikely(cache_size == 0 || n >= cache_size || lcore_id >= RTE_MAX_LCORE))
 		goto ring_dequeue;
 
 	cache = &mp->local_cache[lcore_id];
@@ -968,7 +975,7 @@ __mempool_get_bulk(struct rte_mempool *mp, void **obj_table,
 		uint32_t req = n + (cache_size - cache->len);
 
 		/* How many do we require i.e. number to fill the cache + the request */
-		ret = rte_ring_mc_dequeue_bulk(mp->ring, &cache->objs[cache->len], req);
+		ret = rte_mempool_ext_get_bulk(mp, &cache->objs[cache->len], req);
 		if (unlikely(ret < 0)) {
 			/*
 			 * In the offchance that we are buffer constrained,
@@ -996,10 +1003,7 @@ ring_dequeue:
 #endif /* RTE_MEMPOOL_CACHE_MAX_SIZE > 0 */
 
 	/* get remaining objects from ring */
-	if (is_mc)
-		ret = rte_ring_mc_dequeue_bulk(mp->ring, obj_table, n);
-	else
-		ret = rte_ring_sc_dequeue_bulk(mp->ring, obj_table, n);
+	ret = rte_mempool_ext_get_bulk(mp, obj_table, n);
 
 	if (ret < 0)
 		__MEMPOOL_STAT_ADD(mp, get_fail, n);

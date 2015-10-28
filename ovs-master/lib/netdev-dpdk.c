@@ -87,7 +87,6 @@ static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 20);
 #define MAX_NB_MBUF          (4096 * 64)
 #define MIN_NB_MBUF          (4096 * 4)
 #define MP_CACHE_SZ          RTE_MEMPOOL_CACHE_MAX_SIZE
-//#define MP_CACHE_SZ          256
 
 /* MAX_NB_MBUF can be divided by 2 many times, until MIN_NB_MBUF */
 BUILD_ASSERT_DECL(MAX_NB_MBUF % ROUND_DOWN_POW2(MAX_NB_MBUF/MIN_NB_MBUF) == 0);
@@ -357,7 +356,7 @@ dpdk_mp_get(int socket_id, int mtu) OVS_REQUIRES(dpdk_mutex)
                                      sizeof(struct rte_pktmbuf_pool_private),
                                      rte_pktmbuf_pool_init, NULL,
                                      ovs_rte_pktmbuf_init, NULL,
-                                     socket_id, 0);
+                                     socket_id, MEMPOOL_F_USE_STACK);
     } while (!dmp->mp && rte_errno == ENOMEM && (mp_size /= 2) >= MIN_NB_MBUF);
 
     if (dmp->mp == NULL) {
@@ -1367,6 +1366,7 @@ int parse_lookup2(struct netdev *netdev, struct dp_packet *packet)
       rslt=rte_hash_crc(&entry_start,38,0);
     rslt = rslt & EM_FLOW_HASH_MASK;
     //printf("rslt %d\n", rslt);
+#if 0
     EMC_FOR_EACH_POS_WITH_HASH(&flow_cache, current_entry, rslt) {
     //printf("Mask : \n");
     //for (x=0; x<38; x++)
@@ -1378,7 +1378,8 @@ int parse_lookup2(struct netdev *netdev, struct dp_packet *packet)
           goto out;
           }
     }
-    //rslt=rte_memcmp(cmp_buf,mask_buf, size);
+#endif
+    rslt=rte_memcmp(cmp_buf,mask_buf, size);
 
 out :
     return (int) rslt;

@@ -59,6 +59,7 @@
 #include <rte_spinlock.h>
 
 #include "rte_mempool.h"
+#include "rte_mempool_internal.h"
 
 TAILQ_HEAD(rte_mempool_list, rte_tailq_entry);
 
@@ -149,7 +150,7 @@ mempool_add_elem(struct rte_mempool *mp, void *obj, uint32_t obj_idx,
 		obj_init(mp, obj_init_arg, obj, obj_idx);
 
 	/* enqueue in ring */
-	rte_ring_sp_enqueue(mp->ring, obj);
+	rte_mempool_ext_put_bulk(mp, &obj, 1);
 }
 
 uint32_t
@@ -415,11 +416,9 @@ rte_mempool_xmem_create(const char *name, unsigned n, unsigned elt_size,
 		const phys_addr_t paddr[], uint32_t pg_num, uint32_t pg_shift)
 {
 	char mz_name[RTE_MEMZONE_NAMESIZE];
-	char rg_name[RTE_RING_NAMESIZE];
 	struct rte_mempool_list *mempool_list;
 	struct rte_mempool *mp = NULL;
 	struct rte_tailq_entry *te;
-	struct rte_ring *r;
 	const struct rte_memzone *mz;
 	size_t mempool_size;
 	int mz_flags = RTE_MEMZONE_1GB|RTE_MEMZONE_SIZE_HINT_ONLY;
@@ -483,15 +482,6 @@ rte_mempool_xmem_create(const char *name, unsigned n, unsigned elt_size,
 	}
 
 	rte_rwlock_write_lock(RTE_EAL_MEMPOOL_RWLOCK);
-
-	/* allocate the ring that will be used to store objects */
-	/* Ring functions will return appropriate errors if we are
-	 * running as a secondary process etc., so no checks made
-	 * in this function for that condition */
-	snprintf(rg_name, sizeof(rg_name), RTE_MEMPOOL_MZ_FORMAT, name);
-	r = rte_ring_create(rg_name, rte_align32pow2(n+1), socket_id, rg_flags);
-	if (r == NULL)
-		goto exit;
 
 	/*
 	 * reserve a memory zone for this mempool: private data is
@@ -568,7 +558,7 @@ rte_mempool_xmem_create(const char *name, unsigned n, unsigned elt_size,
 	memset(mp, 0, sizeof(*mp));
 	snprintf(mp->name, sizeof(mp->name), "%s", name);
 	mp->phys_addr = mz->phys_addr;
-	mp->ring = r;
+//	mp->ring = r;
 	mp->size = n;
 	mp->flags = flags;
 	mp->elt_size = objsz.elt_size;
@@ -602,6 +592,18 @@ rte_mempool_xmem_create(const char *name, unsigned n, unsigned elt_size,
 
 	mp->elt_va_end = mp->elt_va_start;
 
+//flags |= MEMPOOL_F_USE_STACK;
+
+	/* Parameters are setup. Allocate the underlying pool handler */
+	if (flags & MEMPOOL_F_USE_STACK) {
+		if (rte_mempool_common_stack_alloc(mp, name, n, socket_id, flags) == NULL)
+			goto exit;
+	}
+	else {
+		if (rte_mempool_common_ring_alloc(mp, name, n, socket_id, flags) == NULL)
+			goto exit;
+	}
+
 	/* call the initializer */
 	if (mp_init)
 		mp_init(mp, mp_init_arg);
@@ -626,7 +628,7 @@ rte_mempool_count(const struct rte_mempool *mp)
 {
 	unsigned count;
 
-	count = rte_ring_count(mp->ring);
+	count = rte_mempool_ext_get_count(mp);
 
 #if RTE_MEMPOOL_CACHE_MAX_SIZE > 0
 	{
@@ -782,7 +784,7 @@ rte_mempool_dump(FILE *f, const struct rte_mempool *mp)
 
 	fprintf(f, "mempool <%s>@%p\n", mp->name, mp);
 	fprintf(f, "  flags=%x\n", mp->flags);
-	fprintf(f, "  ring=<%s>@%p\n", mp->ring->name, mp->ring);
+//	fprintf(f, "  ring=<%s>@%p\n", mp->ring->name, mp->ring);
 	fprintf(f, "  phys_addr=0x%" PRIx64 "\n", mp->phys_addr);
 	fprintf(f, "  size=%"PRIu32"\n", mp->size);
 	fprintf(f, "  header_size=%"PRIu32"\n", mp->header_size);
@@ -805,7 +807,7 @@ rte_mempool_dump(FILE *f, const struct rte_mempool *mp)
 			mp->size);
 
 	cache_count = rte_mempool_dump_cache(f, mp);
-	common_count = rte_ring_count(mp->ring);
+	common_count = /* rte_ring_count(mp->ring)*/0;
 	if ((cache_count + common_count) > mp->size)
 		common_count = mp->size - cache_count;
 	fprintf(f, "  common_pool_count=%u\n", common_count);
