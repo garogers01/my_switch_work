@@ -115,7 +115,8 @@ virtio_dev_rx(struct virtio_net *dev, uint16_t queue_id,
                 rte_prefetch0((void *)buff_addr);
 
 		buff_hdr_addr = buff_addr;
-		packet_len = rte_pktmbuf_data_len(buff) + vq->vhost_hlen;
+		//packet_len = rte_pktmbuf_data_len(buff) + vq->vhost_hlen;
+		packet_len = rte_pktmbuf_data_len(buff);
 
 		if (desc->flags & VRING_DESC_F_NEXT) {
 			desc->len = vq->vhost_hlen;
