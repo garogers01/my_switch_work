@@ -1368,16 +1368,19 @@ int parse_lookup2(struct netdev *netdev, struct dp_packet *packet)
     rslt = rslt & EM_FLOW_HASH_MASK;
     //printf("rslt %d\n", rslt);
     EMC_FOR_EACH_POS_WITH_HASH(&flow_cache, current_entry, rslt) {
+
     //printf("Mask : \n");
     //for (x=0; x<38; x++)
          //printf("%02x ", current_entry->mask[x]);
     //printf("\n\n");
-    if (!rte_memcmp(current_entry->mask, mask_buf, 38 )) {
-          //printf ("found \n");
-          rslt = current_entry->hash;
-          goto out;
+
+          if (!rte_memcmp(current_entry->mask, mask_buf, 38 )) {
+                //printf ("found \n");
+                rslt = current_entry->hash;
+                goto out;
           }
     }
+
     //rslt=rte_memcmp(cmp_buf,mask_buf, size);
 
 out :
@@ -1858,7 +1861,8 @@ netdev_dpdk_send__(struct netdev_dpdk *dev, int qid,
         int dropped = 0;
 
         for (i = 0; i < cnt; i++) {
-            int size = dp_packet_size(pkts[i]);
+            //int size = dp_packet_size(pkts[i]);
+            int size = 0;
 
             if (OVS_UNLIKELY(size > dev->max_packet_len)) {
                 if (next_tx_idx != i) {

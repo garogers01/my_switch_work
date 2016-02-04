@@ -1,0 +1,1 @@
+./tests/test-dpdkr -c $100 -n 4 --proc-type=secondary -- -n $1 &

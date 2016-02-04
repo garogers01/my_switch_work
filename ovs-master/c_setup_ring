@@ -1,0 +1,27 @@
+./utilities/ovs-vsctl del-br br0
+./utilities/ovs-vsctl add-br br0 -- set bridge br0 datapath_type=netdev
+./utilities/ovs-vsctl add-port br0 dpdk0 -- set Interface dpdk0 type=dpdk
+./utilities/ovs-vsctl add-port br0 dpdk1 -- set Interface dpdk1 type=dpdk
+./utilities/ovs-vsctl add-port br0 dpdk2 -- set Interface dpdk2 type=dpdk
+./utilities/ovs-vsctl add-port br0 dpdk3 -- set Interface dpdk3 type=dpdk
+./utilities/ovs-vsctl add-port br0 dpdkr0 -- set Interface dpdkr0 type=dpdkr
+./utilities/ovs-vsctl add-port br0 dpdkr1 -- set Interface dpdkr1 type=dpdkr
+./utilities/ovs-vsctl add-port br0 dpdkr2 -- set Interface dpdkr2 type=dpdkr
+./utilities/ovs-vsctl add-port br0 dpdkvhost1 -- set Interface dpdkvhost1 type=dpdkvhostcuse
+
+sleep 5
+
+./utilities/ovs-vsctl add-port br0 dpdkr0:patch -- set Interface dpdkr0:patch type=dpdkpatch options:peer=dpdk0
+./utilities/ovs-vsctl add-port br0 dpdk0:patch -- set Interface dpdk0:patch type=dpdkpatch options:peer=dpdkr0
+
+./utilities/ovs-vsctl add-port br0 dpdkr1:patch -- set Interface dpdkr1:patch type=dpdkpatch options:peer=dpdk1
+./utilities/ovs-vsctl add-port br0 dpdk1:patch -- set Interface dpdk1:patch type=dpdkpatch options:peer=dpdkr1
+
+./utilities/ovs-vsctl add-port br0 dpdkvhost1:patch -- set Interface dpdkvhost1:patch type=dpdkpatch options:peer=dpdk2
+./utilities/ovs-vsctl add-port br0 dpdk2:patch -- set Interface dpdk2:patch type=dpdkpatch options:peer=dpdkvhost1
+
+./utilities/ovs-vsctl add-port br0 dpdkr2:patch -- set Interface dpdkr2:patch type=dpdkpatch options:peer=dpdk3
+./utilities/ovs-vsctl add-port br0 dpdk3:patch -- set Interface dpdk3:patch type=dpdkpatch options:peer=dpdkr2
+
+#./tests/test-dpdkr -c 1 -n 4 --proc-type=secondary -- -n 0 &
+#./tests/test-dpdkr -c 1 -n 4 --proc-type=secondary -- -n 1 &
