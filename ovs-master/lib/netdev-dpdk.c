@@ -1079,10 +1079,22 @@ struct emc_cache flow_cache;
          i__++, srch_hash__ >>= EM_FLOW_HASH_SHIFT)
 //00 00 05 00 0b 00 00 00 05 00 0a 00 08 00 45 3a 00 00 00 00 00 00 00 11 f7 00 c0 a8 01 03 c0 a8 01 02 00 3f 00 3f 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
 
+/* Port 1 to Port 2 */
 uint8_t entry_start[64] = {0x00 ,0x00 ,0x05 ,0x00 ,0x0b ,0x00 ,0x00 ,0x00 ,0x05 
                        ,0x00 ,0x0a ,0x00 ,0x08 ,0x00 ,0x45 ,0x3a ,0x00 ,0x00 
                        ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x11 ,0x00 ,0x00 ,0xc0 
-                       ,0xa8 ,0x01 ,0x02 ,0xc0 ,0xA8 ,0x01 ,0x01 ,0x00 ,0x3F 
+                       ,0xa8 ,0x01 ,0x02 ,0xc0 ,0xA9 ,0x01 ,0x01 ,0x00 ,0x3F 
+                       ,0x00 ,0x3F ,0x00 ,0x00 ,0xff ,0xff ,0xff ,0xff ,0x00 
+                       ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 
+                       ,0x00 ,0x00 ,0x40 ,0x0e ,0xe2 ,0x67 ,0x71 ,0x7f ,0x00 
+                       ,0x00 }; 
+
+/* Port 2 to Port 1 */
+
+uint8_t entry_start2[64] = {0x00 ,0x00 ,0x05 ,0x00 ,0x0a ,0x00 ,0x00 ,0x00 ,0x05 
+                       ,0x00 ,0x0b ,0x00 ,0x08 ,0x00 ,0x45 ,0x3a ,0x00 ,0x00 
+                       ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x11 ,0x00 ,0x00 ,0xc0 
+                       ,0xa9 ,0x01 ,0x01 ,0xc0 ,0xA8 ,0x01 ,0x02 ,0x00 ,0x3F 
                        ,0x00 ,0x3F ,0x00 ,0x00 ,0xff ,0xff ,0xff ,0xff ,0x00 
                        ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 ,0x00 
                        ,0x00 ,0x00 ,0x40 ,0x0e ,0xe2 ,0x67 ,0x71 ,0x7f ,0x00 
@@ -1106,7 +1118,8 @@ dpdk_emc_cache_init(void)
     for (i = 0; i < ARRAY_SIZE(flow_cache.entries); i++) {
         flow_cache.entries[i].hash=0;
     }
-    for (i = 0; i < ARRAY_SIZE(flow_cache.entries); i++) {
+/* port a to port b */
+    for (i = 0; i < (ARRAY_SIZE(flow_cache.entries))/2; i++) {
         //ip = (struct ip_header *) &entry_start[sizeof (struct eth_header)];
 
         src = (uint32_t *)&entry_start[28];
@@ -1137,11 +1150,44 @@ dpdk_emc_cache_init(void)
             break;
         }
      }
+/* port b to port a */
+    for (i = (ARRAY_SIZE(flow_cache.entries))/2; 
+         i < (ARRAY_SIZE(flow_cache.entries)); i++) {
+        //ip = (struct ip_header *) &entry_start[sizeof (struct eth_header)];
+
+        src = (uint32_t *)&entry_start2[28];
+        dst = (uint32_t *)&entry_start2[32];
+
+        *src =*src + 1;
+        *dst =*dst + 1;
+    //printf("entry : \n");
+    //for (x=0; x<64; x++)
+         //printf("%02x ", entry_start[x]);
+    //printf("\n\n");
+
+        //rslt=rte_jhash(&entry_start2,38,0);
+        rslt=rte_hash_crc(&entry_start2,38,0);
+
+    rslt = rslt & EM_FLOW_HASH_MASK;
+    //printf("rslt = %d\n", rslt);
+
+        EMC_FOR_EACH_POS_WITH_HASH(&flow_cache, current_entry, rslt) {
+          if (rte_memcmp(current_entry->mask, entry_start2, 38 ) != 0) {
+            if (current_entry->hash == 0) {
+               rte_memcpy(current_entry->mask, entry_start2, 38); 
+               current_entry->hash=rslt;
+               ins = 1;
+            }
+          }
+          if (ins)
+            break;
+        }
+     }
     if(rslt == 6156)
     {
     //printf("entry : \n");
     //for (x=0; x<64; x++)
-         //printf("%02x ", entry_start[x]);
+         //printf("%02x ", entry_start2[x]);
     //printf("\n\n");
 
     //printf("current_entry : \n");
@@ -1149,6 +1195,7 @@ dpdk_emc_cache_init(void)
          //printf("%02x ", current_entry->mask[x]);
     //printf("\n\n");
     }
+
    
 }
 
